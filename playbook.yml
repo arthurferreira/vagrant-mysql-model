@@ -1,0 +1,64 @@
+---
+- hosts: all
+  gather_facts: True
+  vars:
+    mysql_root_password: r007p4ssw0rd
+#    mysql_bind_address: 0.0.0.0
+    vagrant_user_password: p4ssw0rd
+  tasks:
+    - name: Update OS and Install MySQL
+      apt: name=mysql-server state=latest update_cache=yes
+
+    - name: Install MySQL-python (this is required for mysql_user ansible module)
+      apt: name=python-mysqldb state=installed
+
+    - name: Ensure MySQL is running
+      service: name=mysql state=started enabled=true
+
+    - name: Ensure MySQL starts on boot
+      command: update-rc.d mysql defaults 
+
+    - name: Set the MySQL root password
+      mysql_user: name="root" password="{{ mysql_root_password }}" host=localhost check_implicit_admin=yes state=present priv=*.*:ALL,GRANT
+
+    - name: Config for easy access as root user
+      template: src=files/my-root.cnf dest=/root/.my.cnf
+
+    - name: Backing up the my.cnf file
+      command: sudo mv /etc/mysql/my.cnf /etc/mysql/my.cnf.default
+
+    - name: Default config with bind-address set to 0.0.0.0
+      template: src=files/my-etc.cnf dest=/etc/mysql/my.cnf
+
+    - name: Delete anonymous MySQL server user for localhost
+      mysql_user: user="" state="absent"
+
+    - name: Secure the MySQL root user for ipv6 localhost (::1)
+      mysql_user: user="root" password="{{ mysql_root_password }}" host="::1"
+
+    - name: Secure the MySQL root user for ipv4 localhost (127.0.0.1)
+      mysql_user: user="root" password="{{ mysql_root_password }}" host="127.0.0.1"
+
+    - name: Secure the MySQL root user for localhost domain (localhost)
+      mysql_user: user="root" password="{{ mysql_root_password }}" host="localhost"
+
+    - name: Secure the MySQL root user for localhost domain (tsn-desenvolvedor-01)
+      mysql_user: user="root" password="{{ mysql_root_password }}" host="10.0.2.2" priv=*.*:ALL,GRANT
+
+    - name: Create the 'vagrantdb' database
+      mysql_db: db=vagrantdb state=present
+
+    - name: Copying the sql script with create and insert statements
+      template: src=files/create-and-insert.sql dest=/tmp/create-and-insert.sql
+
+    - name: Import the 'create-and-insert.sql' script
+      mysql_db: db=vagrantdb state=import target=/tmp/create-and-insert.sql
+
+    - name: Create the MySQL user 'vagrant_user'
+      mysql_user: user="vagrant_user" password="{{ vagrant_user_password }}" host="10.0.2.2" priv=vagrantdb.*:ALL,GRANT state=present
+
+    - name: Remove the mysql test database
+      mysql_db: db=test state=absent
+
+    - name: Restarting MySQL
+      service: name=mysql state=restarted
