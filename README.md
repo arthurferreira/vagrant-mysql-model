@@ -1,3 +1,5 @@
+# vagrant-mysql-model
+
 This is an example of how create virtual machines using vagrant and automatically download, install and configure Ubuntu and MySQL as to manage users and run SQL scripts.
 
 To do the trick, I'm using [Ansible](https://www.ansible.com/) making the job much easier to do. 
